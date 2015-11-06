@@ -1,3 +1,0 @@
-OPEN animals;
-UPDATE animals SET type = "chicken", fly = "no", name = "dude", weight = "9001" WHERE (name == "doug" && health = "bad");
-EXIT;

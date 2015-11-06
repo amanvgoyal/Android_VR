@@ -1,1 +1,0 @@
-cats_or_dogs <- dogs + (select (kind == "cat") animals);
