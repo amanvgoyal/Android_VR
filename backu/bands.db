@@ -1,0 +1,5 @@
+bands 
+*        $primary_key name genre 
+*        genre 
+*        members 
+$        name genre 

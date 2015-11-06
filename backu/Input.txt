@@ -1,0 +1,3 @@
+CREATE TABLE bands (name VARCHAR(20), genre VARCHAR(20), members INTEGER) PRIMARY KEY (name, genre);
+SAVE bands;
+EXIT;

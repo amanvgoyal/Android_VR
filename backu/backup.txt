@@ -1,0 +1,39 @@
+bool Parser::par_comparison(){
+  cout<<"Comparison Called"<<endl;
+  Token temp = ordered.top();
+  if(par_operand()){
+    if(par_op()){
+      if(par_operand()){
+	cout<<"Return True(Comparison)"<<endl;
+	return true;
+      }
+    }
+  }
+  temp =ordered.top();
+  if(temp.get_type()==T_LPAR){
+    ordered.pop();
+    if(ordered.empty()){
+      cout<<"INVALID(Comparison): STACK EMPTY"<<endl;
+      return false;
+    }
+    
+    temp = ordered.top();
+    while(temp.get_type()!=T_RPAR){
+      if(par_conjuction()){
+	temp = ordered.top();
+      }
+      else return false;
+    }
+
+    temp = ordered.top();
+    if(temp.get_type()==T_RPAR){
+      ordered.pop();
+      if(ordered.empty()){
+	cout<<"INVALID(Comparison): STACK EMPTY"<<endl;
+	return false;
+      }
+      return true;
+    }
+  }
+  return false;
+}

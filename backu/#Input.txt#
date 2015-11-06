@@ -1,0 +1,2 @@
+CREATE TABLE bands (name (VARCHAR(@)
+EXIT;
