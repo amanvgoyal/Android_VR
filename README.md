@@ -1,3 +1,3 @@
-csce 315 project 3
+CSCE 313 Project 3
 
 A google cardboard app
