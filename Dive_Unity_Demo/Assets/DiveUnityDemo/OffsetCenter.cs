@@ -5,24 +5,45 @@ public class OffsetCenter : MonoBehaviour {
 	/// Offset projection for 2 cameras in VR
 	public float offset =0.0f;
 	public float max_offset=0.002f;
-	//public float max_offcenter_warp=0.1f;
 	public Camera cameraleft;
 	public Camera cameraright;
 
 	private float correctionfactor;
 	public static OffsetCenter instance;
+	public bool autoCorrectOffset=true;
+	private bool debugMetrics=false;
+	
+	private int vpixels;
+	private int hpixels;
+	private float ydpi;
+	private float xdpi;
+	private float xmm;
+	private float ymm;
+	private float mmdist;
+	private float correction_factor = 0.0f;
 
 	public void Start(){
-
-	
-		instance = this;
+		// Screen Metrics
+		float dpi = Screen.dpi;
+		Debug.Log (dpi);
+		if(dpi <=0){
+			dpi = 1;
+		}
+		vpixels=Screen.height;
+		hpixels=Screen.width;
+		xmm=hpixels/Screen.dpi/0.0393701f;
+		ymm=vpixels/Screen.dpi/0.0393701f;
+		mmdist = xmm / 2;
 	}
 	
 	public void Update () {
-
-		//cameraleft.SendMessage("set_x_offcenter_warp",-max_offcenter_warp*correctionfactor);
-		//cameraright.SendMessage("set_x_offcenter_warp",max_offcenter_warp*correctionfactor);
-		
+		correction_factor=0.002f*((mmdist-55.0f)/(76.0f-55.0f));
+#if UNITY_EDITOR
+#elif UNITY_ANDROID	
+		if (autoCorrectOffset) {
+				setCorrectionFactor(correction_factor);
+		}
+#endif
 	}
 	
 	private void SetVanishingPoint (Camera cam, Vector2 perspectiveOffset) {
@@ -36,7 +57,8 @@ public class OffsetCenter : MonoBehaviour {
 		float top = bottom+h;
 		
 		cam.projectionMatrix = PerspectiveOffCenter(left, right, bottom, top, cam.nearClipPlane, cam.farClipPlane);
-	}
+
+}
 	
 	private static Matrix4x4 PerspectiveOffCenter (float left, float right, float bottom, float top, float near, float far)
 	{
@@ -57,8 +79,10 @@ public class OffsetCenter : MonoBehaviour {
 	}
 
 	public void setCorrectionFactor(float fac){
-		offset=max_offset*fac;
-	    correctionfactor=fac;
+		//offset=max_offset*fac;
+		offset = fac * 10;
+		correctionfactor=fac;
+		Debug.Log (offset);
 		SetVanishingPoint(cameraleft, new Vector2(offset, 0.0f));
 		SetVanishingPoint(cameraright, new Vector2(-offset, 0.0f));
 	}

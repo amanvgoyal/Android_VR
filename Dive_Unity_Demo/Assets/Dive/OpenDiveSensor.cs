@@ -1,397 +1,323 @@
+//Durovis Dive Head Tracking 
+//copyright by Shoogee GmbH & Co. KG Refer to LICENCE.txt 
 using UnityEngine;
 using System.Collections;
 using System.Runtime.InteropServices;
-using System.IO;
 using System;
 
-
-
-//Dive Head Tracking 
-// copyright by Shoogee GmbH & Co. KG Refer to LICENCE.txt 
-
-
-//[ExecuteInEditMode]
-public class OpenDiveSensor : MonoBehaviour {
+public class OpenDiveSensor : MonoBehaviour
+{
 	
-	// This is used for rotating the camera with another object
+	//if true, rotation of a GameObject will be added
 	//for example tilting the camera while going along a racetrack or rollercoaster
-	public bool add_rotation_gameobject=false;
-	public GameObject rotation_gameobject;
+	public bool AddRotationGameobject = false;
+	//e.g.: the head of the player, or a waggon of a rollercoaster
+	public GameObject RotationGameobject;
+	//Texture to display when no gyro is found
+	public Texture NoGyroTexture;
+	//if true, yaw will be rotated to 0 of a scene (e.g. when you load another scene)
+	public bool correctCenterTransition = false;
+	//script to learn about a device's default orientation, needed for axis correction on some tablets
+	public NaturalOrientation no;
 
-	// mouse emulation
-	public bool emulateMouseInEditor=true;
-	public enum RotationAxes { MouseXAndY = 0, MouseX = 1, MouseY = 2 }
-	public RotationAxes axes = RotationAxes.MouseXAndY;
-	public Texture nogyrotexture;
+	private bool mbShowErrorMessage, mbUseGyro;
+	private float q0, q1, q2, q3;
+	private float m0, m1, m2;
+	private float magnet_value = 0;
+	private int magnet_trigger = 0;
+	private int magnet_detected;
+	private Quaternion rot;
+	private Quaternion centerTransition = Quaternion.identity;
 
-	/// Offset projection for 2 cameras in VR
-	private float offset =0.0f;
-	private float max_offset=0.002f;
-	//public float max_offcenter_warp=0.1f;
-	public Camera cameraleft;
-	public Camera cameraright;
-	
-	public float zoom=0.1f;
-	private float IPDCorrection=0.0f;
-	private float aspectRatio;
-	public float znear=0.1f;
-	public float zfar=10000.0f;
-
-
-
-	private float time_since_last_fullscreen=0;
 	private int is_tablet;
 
-	AndroidJavaObject mConfig;
-	AndroidJavaObject mWindowManager;
-
-
-	private float q0,q1,q2,q3;
-	private float m0,m1,m2;
-	Quaternion rot;
-	private bool show_gyro_error_message=false;
-
-	string errormessage;
-
-
 #if UNITY_EDITOR
-	private float sensitivityX = 15F;
-	private float sensitivityY = 15F;
-	
-	private float minimumX = -360F;
-	private float maximumX = 360F;
-	
-	private float minimumY = -90F;
-	private float maximumY = 90F;
-	
-	float rotationY = 0F;
-
-
-
-
-  #elif UNITY_ANDROID
-	private static AndroidJavaClass javadivepluginclass;
-	private static AndroidJavaClass javaunityplayerclass;
-	private static AndroidJavaObject currentactivity;
+#elif UNITY_ANDROID
 	private static AndroidJavaObject javadiveplugininstance;
 
+	[DllImport("divesensor")]
+	private static extern int dive_set_path(string path);
 
+	[DllImport("divesensor")]
+	private static extern void initialize_sensors();
 
-	[DllImport("divesensor")]	private static extern void initialize_sensors();
-	[DllImport("divesensor")]	private static extern int get_q(ref float q0,ref float q1,ref float q2,ref float q3);
-	[DllImport("divesensor")]	private static extern int get_m(ref float m0,ref float m1,ref float m2);
-	[DllImport("divesensor")]	private static extern int get_error();
-	[DllImport("divesensor")]   private static extern void dive_command(string command);
+	[DllImport("divesensor")]
+	private static extern int get_q(ref float q0, ref float q1, ref float q2, ref float q3);
 
+	[DllImport("divesensor")]
+	private static extern int process();
 
-   
-   #elif UNITY_IPHONE
-	[DllImport("__Internal")]	private static extern void initialize_sensors();
-	[DllImport("__Internal")]	private static extern float get_q0();
-	[DllImport("__Internal")]	private static extern float get_q1();
-	[DllImport("__Internal")]	private static extern float get_q2();
-	[DllImport("__Internal")]	private static extern float get_q3();
-	[DllImport("__Internal")]	private static extern void DiveUpdateGyroData();
-    [DllImport("__Internal")]	private static extern int get_q(ref float q0,ref float q1,ref float q2,ref float q3);
+	[DllImport("divesensor")]
+	private static extern void set_application_name(string name);
 	
+	[DllImport("divesensor")]
+	private static extern int get_magnet(ref int detected,ref int t1,ref float t2);
+
+	[DllImport("divesensor")]
+	private static extern int get_m(ref float m0,ref float m1,ref float m2);
+
+	[DllImport("divesensor")]
+	private static extern void use_udp(int switchon);
+
+	[DllImport("divesensor")]
+	private static extern void get_version(string msg, int maxlength);
+
+	[DllImport("divesensor")]
+	private static extern int get_error();
 	
-#endif 	
+	[DllImport("divesensor")]   
+	private static extern void dive_command(string command);
 
+#elif UNITY_IPHONE
+	[DllImport("__Internal")]
+	private static extern void initialize_sensors();
 
-	public static void divecommand(string command){
-		#if UNITY_EDITOR
-		#elif UNITY_ANDROID
-		dive_command(command);
-		#elif UNITY_IPHONE
-		#endif
+	[DllImport("__Internal")]
+	private static extern void stop_sensors();
 
-	}
+	[DllImport("__Internal")]	
+	private static extern float get_q0();
 
-	public static void setFullscreen(){
-		#if UNITY_EDITOR
-		
-		#elif UNITY_ANDROID
-		String answer;
-		answer= javadiveplugininstance.Call<string>("setFullscreen");
+	[DllImport("__Internal")]	
+	private static extern float get_q1();
 
-		
-		#elif UNITY_IPHONE
-		
-		#endif 	
-		
-		return;
-	}
+	[DllImport("__Internal")]	
+	private static extern float get_q2();
 
+	[DllImport("__Internal")]	
+	private static extern float get_q3();
 
+	[DllImport("__Internal")]	
+	private static extern void DiveUpdateGyroData();
 
+	[DllImport("__Internal")]	
+	private static extern int get_q(ref float q0,ref float q1,ref float q2,ref float q3);
 
+	[DllImport("__Internal")]	
+	private static extern int get_magnet(ref int detected,ref int t1,ref float t2);
 
-	void Start () {
-
-
-	
-
-
-
-
-		rot=Quaternion.identity;
-	    // Disable screen dimming
-     	Screen.sleepTimeout = SleepTimeout.NeverSleep;
-		Application.targetFrameRate = 60;
-
-
-
-
-
-
-#if UNITY_EDITOR
-
-		if (rigidbody)
-			rigidbody.freezeRotation = true;
-
-  #elif UNITY_ANDROID
-
-		// Java part
-		javadivepluginclass = new AndroidJavaClass("com.shoogee.divejava.divejava") ;
-		javaunityplayerclass= new AndroidJavaClass("com.unity3d.player.UnityPlayer");
-		currentactivity = javaunityplayerclass.GetStatic<AndroidJavaObject>("currentActivity");
-		javadiveplugininstance = javadivepluginclass.CallStatic<AndroidJavaObject>("instance");
-		object[] args={currentactivity};
-		javadiveplugininstance.Call<string>("set_activity",args);
-
-
-		initialize_sensors ();
-
-
-
-		String answer;
-		answer= javadiveplugininstance.Call<string>("initializeDive");
-		answer= javadiveplugininstance.Call<string>("getDeviceType");
-		if (answer=="Tablet"){
-				is_tablet=1;
-			Debug.Log("Dive Unity Tablet Mode activated");
-		
-		}
-		else{
-			Debug.Log("Dive Phone Mode activated "+answer);
-		}
-
-
-		answer= javadiveplugininstance.Call<string>("setFullscreen");
-
-		show_gyro_error_message=true;
-		Network.logLevel = NetworkLogLevel.Full;
-
-
-		int err = get_error();
-		if (err==0){ errormessage="";
-			show_gyro_error_message=false;
-
-		}
-		if (err==1){
-			show_gyro_error_message=true;
-			errormessage="ERROR: Dive needs a Gyroscope and your telephone has none, we are trying to go to Accelerometer compatibility mode. Dont expect too much.";
-		}
-
-
-
-	#elif UNITY_IPHONE
-		initialize_sensors();
+	[DllImport("__Internal")]	
+	private static extern int get_m(ref float m0,ref float m1,ref float m2);
 #endif
+	void Start()
+	{
+		mbShowErrorMessage = true;
+		mbUseGyro = false;
 
-		float tabletcorrection=-0.028f;
-		//is_tablet=0;
+		//load some settings from PlayerPrefs
+		DInput.load ();
 
-		if (is_tablet==1)
-		{
+		rot = Quaternion.identity;
 
-			Debug.Log ("Is tablet, using tabletcorrection");
-			IPDCorrection=tabletcorrection;
-		}
-		else 
-		{
-			IPDCorrection=IPDCorrection;
-
-		}
-
-		//setIPDCorrection(IPDCorrection); 
-
-
-	}
-
-
-	
-	void Update () {
-		aspectRatio=(Screen.height*2.0f)/Screen.width;
-		setIPDCorrection(IPDCorrection); 
-
-		//Debug.Log ("Divecamera"+cameraleft.aspect+"1/asp "+1/cameraleft.aspect+" Screen Width/Height "+ aspectRatio);
-
-
-
-
+		//Disable screen dimming
+		Screen.sleepTimeout = SleepTimeout.NeverSleep;
+		//set Frame Rate hint to 60 FPS
+		Application.targetFrameRate = 60;
 #if UNITY_EDITOR
-
-	#elif UNITY_ANDROID
-		time_since_last_fullscreen+=Time.deltaTime;
-		
-		if (time_since_last_fullscreen >8){
-			setFullscreen ();
-			time_since_last_fullscreen=0;
-
-			
-		}
-
-		get_q(ref q0,ref q1,ref q2,ref q3);
-		//get_m(ref m0,ref m1,ref m2);
-		rot.x=-q2;rot.y=q3;rot.z=-q1;rot.w=q0;
-
-
-		
-		if (add_rotation_gameobject){
-			transform.rotation =rotation_gameobject.transform.rotation* rot;
+#elif UNITY_ANDROID
+		// Java part
+		DiveJava.init ();
+		dive_set_path(Application.persistentDataPath);
+		Network.logLevel = NetworkLogLevel.Full;
+		use_udp(1);
+		initialize_sensors();
+		int err = get_error();
+		if(err == 0)
+		{
+			mbShowErrorMessage = false;
+			mbUseGyro = true;
+			if(correctCenterTransition){
+				get_q(ref q0, ref q1, ref q2, ref q3);
+				rot.x = -q2;
+				rot.y = q3;
+				rot.z = -q1;
+				rot.w = q0;
+				Quaternion temp = Quaternion.identity;
+				temp.eulerAngles = new Vector3(0,rot.eulerAngles.y,0);
+				this.centerTransition = Quaternion.identity * Quaternion.Inverse(temp);
+			}
+	
+			if (no.GetDeviceDefaultOrientation() == NaturalOrientation.LANDSCAPE){
+				is_tablet=1;
+				Debug.Log("Dive Unity Tablet Mode activated");
+			}
+			else{
+				Debug.Log("Dive Phone Mode activated");
+			}
 		}
 		else
 		{
-			transform.rotation = rot;
-			if (is_tablet==1)transform.rotation=rot*Quaternion.AngleAxis(90,Vector3.forward);
-			
+			mbShowErrorMessage = true;
+			mbUseGyro = false;
 		}
+#elif UNITY_IPHONE
+		initialize_sensors();
+		mbShowErrorMessage = false;
+		mbUseGyro = true;
+#endif
+	}
 
+	//Eventhandler for Magnet Trigger; example usage:
+	//private void myFunction(object sender, EventArgs e){...}
+	//this.MagnetTriggered += myFunction;
+	public event EventHandler MagnetTriggered;
 
+	protected virtual void OnMagnetTriggered()
+	{
+		if(MagnetTriggered != null)
+			MagnetTriggered(this, EventArgs.Empty);
+	}
+	
+	private bool mbMagnetDown = false;
+	
+	void Update()
+	{
+#if UNITY_EDITOR
+#elif UNITY_ANDROID
+		process();
+		get_q(ref q0, ref q1, ref q2, ref q3);
+		rot.x = -q2;
+		rot.y = q3;
+		rot.z = -q1;
+		rot.w = q0;
 
-	#elif UNITY_IPHONE
+		get_magnet(ref magnet_detected,ref magnet_trigger,ref magnet_value);
+#elif UNITY_IPHONE
 		DiveUpdateGyroData();
 		get_q(ref q0,ref q1,ref q2,ref q3);
 		rot.x=-q2;
 		rot.y=q3;
 		rot.z=-q1;
 		rot.w=q0;
-		transform.rotation = rot;
 
-
-		
-		if (add_rotation_gameobject){
-			transform.rotation =rotation_gameobject.transform.rotation* rot;
-		}
-		else
-		{
-			transform.rotation = rot;
-			if (is_tablet==1)transform.rotation=rot*Quaternion.AngleAxis(90,Vector3.forward);
-			
-		}
-
-
+		get_magnet(ref magnet_detected,ref magnet_trigger,ref magnet_value);
+		get_m(ref m0,ref m1,ref m2);
 #endif
 
-
-	
-
-
-#if UNITY_EDITOR
-
-		if (emulateMouseInEditor){
-			
-
-			if (axes == RotationAxes.MouseXAndY)
+		if(mbUseGyro)
+		if(Time.timeSinceLevelLoad > 0.1f)
+			if(correctCenterTransition)
 			{
-				float rotationX = transform.localEulerAngles.y + Input.GetAxis("Mouse X") * sensitivityX;
-				
-				rotationY += Input.GetAxis("Mouse Y") * sensitivityY;
-				rotationY = Mathf.Clamp (rotationY, minimumY, maximumY);
-				
-				transform.localEulerAngles = new Vector3(-rotationY, rotationX, 0);
+				if(AddRotationGameobject){
+					if (is_tablet==1){
+						transform.rotation = RotationGameobject.transform.rotation * (centerTransition * rot)* Quaternion.AngleAxis(90,Vector3.forward);
+					}else{
+						transform.rotation = RotationGameobject.transform.rotation * (centerTransition * rot);
+					}
+				}else{
+					if (is_tablet==1){
+						transform.rotation = centerTransition * rot * Quaternion.AngleAxis(90,Vector3.forward);
+					}else{
+						transform.rotation = centerTransition * rot;
+					}
+				}
 			}
-			else if (axes == RotationAxes.MouseX)
+		else
+		{
+			if(AddRotationGameobject)
+			if (is_tablet==1){
+				transform.rotation= RotationGameobject.transform.rotation * rot * Quaternion.AngleAxis(90,Vector3.forward);
+			} else transform.rotation = RotationGameobject.transform.rotation * rot;
+			else if (is_tablet==1){
+				transform.rotation= rot * Quaternion.AngleAxis(90,Vector3.forward);
+			} else transform.rotation = rot;
+		}
+
+
+		if(DInput.magnet_trigger != magnet_trigger && magnet_trigger == 1)
+			DInput.magnet_trigger_posedge = true;
+		else
+			DInput.magnet_trigger_posedge = false;
+		if(DInput.magnet_trigger != magnet_trigger && magnet_trigger == 0)
+			DInput.magnet_trigger_negedge = true;
+		else
+			DInput.magnet_trigger_negedge = false;
+		DInput.magnet_trigger = magnet_trigger;
+
+		if(DInput.use_analog_value)
+		{
+			DInput.magnet_value = magnet_value;
+			if(DInput.invert)
+				DInput.magnet_value = 1 - magnet_value;
+		}
+
+		{
+			if(!mbMagnetDown)
 			{
-				transform.Rotate(0, Input.GetAxis("Mouse X") * sensitivityX, 0);
+#if UNITY_EDITOR
+				if(Input.GetKey(KeyCode.Space) || Input.GetMouseButtonDown(0))
+#else
+				if(DInput.magnet_trigger == 1 || Input.GetMouseButtonDown(0))
+#endif
+				{
+					mbMagnetDown = true;
+				}
 			}
 			else
 			{
-				rotationY += Input.GetAxis("Mouse Y") * sensitivityY;
-				rotationY = Mathf.Clamp (rotationY, minimumY, maximumY);
-				
-				transform.localEulerAngles = new Vector3(-rotationY, transform.localEulerAngles.y, 0);
-			}
-		}
+#if UNITY_EDITOR
+				if(!Input.GetKey(KeyCode.Space))
+#else
+				if(DInput.magnet_trigger != 1)
 #endif
-
-
-
-	}
-	
-	void OnGUI ()
-	{
-	
-	/*	if (GUI.Button(new Rect(Screen.width/4-150, Screen.height-100, 300,100), "+IPD")){
-			Debug.Log("Clicked the button with an image");
-			IPDCorrection=IPDCorrection+0.01f;
-			setIPDCorrection(IPDCorrection);
-		}
-
-		if (GUI.Button(new Rect(Screen.width-Screen.width/4-150, Screen.height-100, 300,100), "-IPD")){
-			Debug.Log("Clicked the button with an image");
-
-			IPDCorrection=IPDCorrection-0.01f;
-			setIPDCorrection(IPDCorrection);
-		}
-*/
-
-
-		if (show_gyro_error_message)
-		{
-
-			if(GUI.Button(new Rect(0,0, Screen.width, Screen.height) , "Error: \n\n No Gyro detected \n \n Touch screen to continue anyway")) {
-				show_gyro_error_message=false;
+				{
+					OnMagnetTriggered();
+					mbMagnetDown = false;
+				}
 			}
-			GUI.DrawTexture(new Rect(Screen.width/2-320, Screen.height/2-240, 640, 480), nogyrotexture, ScaleMode.ScaleToFit, true, 0);
-			return;
-
 		}
-
-
-
-
 	}
 
+	void OnGUI()
+	{
+		if(mbShowErrorMessage){
+			if(GUI.Button(new Rect(0, 0, Screen.width, Screen.height), "button"))
+				mbShowErrorMessage = false;
 
-
-
-	void setIPDCorrection(float correction) {
-
-		// not using camera nearclipplane value because that leads to problems with field of view in different projects
-
-
-		cameraleft.projectionMatrix = PerspectiveOffCenter((-zoom+correction)*(znear/0.1f), (zoom+correction)*(znear/0.1f), -zoom*(znear/0.1f)*aspectRatio, zoom*(znear/0.1f)*aspectRatio, znear, zfar);;
-		cameraright.projectionMatrix = PerspectiveOffCenter((-zoom-correction)*(znear/0.1f), (zoom-correction)*(znear/0.1f), -zoom*(znear/0.1f)*aspectRatio, zoom*(znear/0.1f)*aspectRatio, znear, zfar);;
+			if(NoGyroTexture != null){
+				int liHeight = (int)(Screen.height * 0.9);
+				GUI.DrawTexture(new Rect((Screen.width - liHeight) / 2, (Screen.height - liHeight) / 2, liHeight, liHeight), NoGyroTexture, ScaleMode.StretchToFill, true, 0);
+			}
 		}
+	}
+
+	void OnApplicationQuit(){
+#if UNITY_EDITOR
+#elif UNITY_IOS
+		stop_sensors();
+#endif
+	}
+
+}
+
+public static class DInput
+{
+	public static bool use_cardboard_trigger = true;
+	public static bool use_analog_value = false;
+	public static bool magnet_detected = false;
+	public static int magnet_trigger = 0;
+	public static bool magnet_trigger_posedge = false;
+	public static bool magnet_trigger_negedge = false;
+	public static float magnet_value = 0.0f;
+	public static bool invert = false;
+	public static bool use_IPD_Correction;
+	public static float IPDCorrectionValue = 0;
 	
-	static Matrix4x4 PerspectiveOffCenter(float left, float right, float bottom, float top, float near, float far) {
-		float x = 2.0F * near / (right - left);
-		float y = 2.0F * near / (top - bottom);
-		float a = (right + left) / (right - left);
-		float b = (top + bottom) / (top - bottom);
-		float c = -(far + near) / (far - near);
-		float d = -(2.0F * far * near) / (far - near);
-		float e = -1.0F;
-		Matrix4x4 m = new Matrix4x4();
-		m[0, 0] = x;
-		m[0, 1] = 0;
-		m[0, 2] = a;
-		m[0, 3] = 0;
-		m[1, 0] = 0;
-		m[1, 1] = y;
-		m[1, 2] = b;
-		m[1, 3] = 0;
-		m[2, 0] = 0;
-		m[2, 1] = 0;
-		m[2, 2] = c;
-		m[2, 3] = d;
-		m[3, 0] = 0;
-		m[3, 1] = 0;
-		m[3, 2] = e;
-		m[3, 3] = 0;
-		return m;
+	public static void save()
+	{
+		PlayerPrefs.SetInt("dive_use_cardboard_trigger", (use_cardboard_trigger ? 1 : 0));
+		PlayerPrefs.SetInt("dive_use_cardboard_analog_value", (use_analog_value ? 1 : 0));
+		PlayerPrefs.SetInt("dive_invert_axis", (invert ? 1 : 0));
+		PlayerPrefs.SetInt("dive_use_ipd_correction", (use_IPD_Correction ? 1 : 0));
+		PlayerPrefs.SetFloat("dive_ipd_correction_value", IPDCorrectionValue);
 	}
 	
+	public static void load()
+	{
+		use_cardboard_trigger = (PlayerPrefs.GetInt("dive_use_cardboard_trigger") != 0);
+		use_analog_value = (PlayerPrefs.GetInt("dive_use_cardboard_analog_value") != 0);
+		invert = (PlayerPrefs.GetInt("dive_invert_axis") != 0);
+		use_IPD_Correction = (PlayerPrefs.GetInt("dive_use_ipd_correction") != 0);
+		IPDCorrectionValue = (PlayerPrefs.GetFloat("dive_ipd_correction_value"));
+	}
 }

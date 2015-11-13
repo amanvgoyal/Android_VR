@@ -29,6 +29,9 @@ GameObject:
   m_Component:
   - 4: {fileID: 400002}
   - 114: {fileID: 11400000}
+  - 114: {fileID: 11417912}
+  - 114: {fileID: 11427402}
+  - 114: {fileID: 11414774}
   m_Layer: 0
   m_Name: Dive_Camera
   m_TagString: MainCamera
@@ -213,16 +216,57 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9db6421691659684d915086e04c493c2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  add_rotation_gameobject: 0
-  rotation_gameobject: {fileID: 0}
-  emulateMouseInEditor: 1
+  AddRotationGameobject: 0
+  RotationGameobject: {fileID: 0}
+  NoGyroTexture: {fileID: 2800000, guid: 286000da31c179247a31fdf256605ee2, type: 3}
+  correctCenterTransition: 0
+  no: {fileID: 11414774}
+--- !u!114 &11414774
+MonoBehaviour:
+  m_ObjectHideFlags: 1
+  m_PrefabParentObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 100100000}
+  m_GameObject: {fileID: 100002}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 15ce66c934a4a1142931dc226f579b48, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &11417912
+MonoBehaviour:
+  m_ObjectHideFlags: 1
+  m_PrefabParentObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 100100000}
+  m_GameObject: {fileID: 100002}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bf4bda8a209f8974f94a6b1d673d52fe, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
   axes: 0
-  nogyrotexture: {fileID: 2800000, guid: 286000da31c179247a31fdf256605ee2, type: 3}
+  sensitivityX: 15
+  sensitivityY: 15
+  minimumX: -360
+  maximumX: 360
+  minimumY: -60
+  maximumY: 60
+--- !u!114 &11427402
+MonoBehaviour:
+  m_ObjectHideFlags: 1
+  m_PrefabParentObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 100100000}
+  m_GameObject: {fileID: 100002}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b880e42733a8db149a76575016f01dd3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  offset: 0
+  max_offset: .00200000009
   cameraleft: {fileID: 2000002}
   cameraright: {fileID: 2000000}
-  zoom: .0960000008
-  znear: .100000001
-  zfar: 10000
+  autoCorrectOffset: 1
+  debugMetrics: 0
 --- !u!124 &12400000
 Behaviour:
   m_ObjectHideFlags: 1
